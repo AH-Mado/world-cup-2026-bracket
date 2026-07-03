@@ -299,7 +299,7 @@
     .round-tabs {
       display: flex;
       gap: 6px;
-      padding: 10px 16px;
+      padding: 14px 16px 12px;
       overflow-x: auto;
       scrollbar-width: none;
       -webkit-overflow-scrolling: touch;
@@ -589,10 +589,16 @@ let userSelectedRound = false;
 function selectRound(i) {
   if (i < 0 || i >= ROUNDS.length || i === activeRound) return;
   userSelectedRound = true;
+  const savedScrollY = window.scrollY;
   activeRound = i;
   render();
-  const activeTab = document.querySelector('.round-tab.active');
-  if (activeTab) activeTab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  window.scrollTo(0, savedScrollY);
+  const tabBar = document.getElementById('roundTabs');
+  const activeTab = tabBar && tabBar.querySelector('.round-tab.active');
+  if (tabBar && activeTab) {
+    const target = activeTab.offsetLeft - (tabBar.clientWidth - activeTab.clientWidth) / 2;
+    tabBar.scrollTo({ left: Math.max(0, target), behavior: 'smooth' });
+  }
 }
 
 function setupSwipeGestures() {
