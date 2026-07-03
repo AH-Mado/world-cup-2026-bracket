@@ -238,8 +238,8 @@
   /* ── Round tabs (pill row like the mockup) ─────────────── */
   .round-tabs {
     display: flex;
-    gap: 8px;
-    padding: 16px 20px 6px;
+    gap: 5px;
+    padding: 10px 20px 4px;
     overflow-x: auto;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
@@ -255,32 +255,33 @@
   .round-tabs::-webkit-scrollbar { display: none; }
   .round-tab {
     flex: 0 0 auto;
-    padding: 10px 18px;
+    padding: 5px 10px;
     border-radius: var(--radius-pill);
     border: 1px solid var(--border);
     background: var(--surface);
     color: var(--text-muted);
     font-family: var(--font-body);
-    font-size: 14px;
+    font-size: 11px;
     font-weight: 600;
-    letter-spacing: -0.01em;
+    letter-spacing: 0;
     cursor: pointer;
     white-space: nowrap;
     transition: all 0.2s ease;
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: 5px;
+    line-height: 1.15;
   }
   .round-tab:hover { border-color: var(--border-strong); color: var(--text); }
   .round-tab.active {
     background: var(--accent);
     color: #fff;
     border-color: var(--accent);
-    box-shadow: 0 8px 22px rgba(43, 108, 255, 0.45);
+    box-shadow: 0 3px 10px rgba(43, 108, 255, 0.35);
   }
   .round-tab .tab-count {
-    opacity: 0.75;
-    font-size: 12px;
+    opacity: 0.65;
+    font-size: 9.5px;
     font-weight: 500;
     letter-spacing: 0;
   }
@@ -429,13 +430,41 @@
     background: var(--surface);
     border-style: dashed;
     color: var(--text-dim);
-    animation: pulseFade 2.2s ease-in-out infinite;
+    position: relative;
+    overflow: hidden;
   }
-  @keyframes pulseFade {
-    0%, 100% { opacity: 0.55; }
-    50% { opacity: 1; }
+  .side.empty .flag-badge::after,
+  .side.empty .team-name::after,
+  .shimmer::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      100deg,
+      transparent 20%,
+      rgba(255, 255, 255, 0.14) 50%,
+      transparent 80%
+    );
+    background-size: 220% 100%;
+    background-repeat: no-repeat;
+    animation: shimmer 1.8s ease-in-out infinite;
+    pointer-events: none;
   }
-  .side.empty .team-name { color: var(--text-dim); font-style: italic; font-weight: 500; }
+  @keyframes shimmer {
+    0%   { background-position: 220% 0; }
+    100% { background-position: -120% 0; }
+  }
+  .side.empty .team-name {
+    color: var(--text-dim);
+    font-weight: 500;
+    position: relative;
+    overflow: hidden;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 2px 8px;
+  }
+  .shimmer { position: relative; overflow: hidden; }
+  .live-pill.shimmer { color: var(--text-muted); }
 
   .score-block {
     display: flex;
@@ -684,7 +713,7 @@
 <section class="hero">
   <div class="hero-top">
     <div class="hero-eyebrow"><span class="dot"></span>Knockout Stage</div>
-    <div class="live-pill">
+    <div class="live-pill shimmer" id="livePill">
       <span class="live-dot"></span>
       <span id="liveStatus">Loading live data…</span>
     </div>
@@ -969,13 +998,15 @@ function matchHTML(match, isFinal) {
 
 let activeRound = 0;
 let userSelectedRound = false;
+const roundScrollY = {};
 function selectRound(i) {
   if (i < 0 || i >= ROUNDS.length || i === activeRound) return;
   userSelectedRound = true;
-  const savedScrollY = window.scrollY;
+  roundScrollY[activeRound] = window.scrollY;
   activeRound = i;
   render();
-  window.scrollTo(0, savedScrollY);
+  const restore = roundScrollY[i] ?? 0;
+  window.scrollTo(0, restore);
   const tabBar = document.getElementById('roundTabs');
   const activeTab = tabBar && tabBar.querySelector('.round-tab.active');
   if (tabBar && activeTab) {
@@ -1181,9 +1212,11 @@ async function fetchLiveData() {
   return data.events || [];
 }
 
-function setStatus(text) {
+function setStatus(text, opts) {
   const el = document.getElementById('liveStatus');
   if (el) el.textContent = text;
+  const pill = document.getElementById('livePill');
+  if (pill) pill.classList.toggle('shimmer', !!(opts && opts.loading));
 }
 
 function pickDefaultRound() {
@@ -1219,7 +1252,7 @@ async function initLive() {
 async function refreshLive() {
   const btn = document.querySelector('.icon-btn');
   if (btn) { btn.disabled = true; btn.classList.add('loading'); }
-  setStatus('Refreshing…');
+  setStatus('Refreshing…', { loading: true });
   await initLive();
   if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
 }
