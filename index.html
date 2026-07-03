@@ -352,7 +352,14 @@
       min-width: 0;
       width: 100%;
     }
-    .round.active-round { display: flex; }
+    .round.active-round {
+      display: flex;
+      animation: roundEnter 0.22s ease-out;
+    }
+    @keyframes roundEnter {
+      from { opacity: 0; transform: translateX(10px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
     .round-label { display: none; }
     .round-matches { gap: 12px; justify-content: flex-start; }
     .match-slot { flex: 0 0 auto; }
@@ -580,9 +587,38 @@ function matchHTML(match, isFinal) {
 let activeRound = 0;
 let userSelectedRound = false;
 function selectRound(i) {
+  if (i < 0 || i >= ROUNDS.length || i === activeRound) return;
   userSelectedRound = true;
   activeRound = i;
   render();
+  const activeTab = document.querySelector('.round-tab.active');
+  if (activeTab) activeTab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+}
+
+function setupSwipeGestures() {
+  const bracket = document.getElementById('bracket');
+  if (!bracket || bracket.__swipeReady) return;
+  bracket.__swipeReady = true;
+  let sx = 0, sy = 0, t0 = 0;
+  bracket.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) return;
+    sx = e.touches[0].clientX;
+    sy = e.touches[0].clientY;
+    t0 = Date.now();
+  }, { passive: true });
+  bracket.addEventListener('touchend', (e) => {
+    if (!t0) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - sx;
+    const dy = t.clientY - sy;
+    const dt = Date.now() - t0;
+    t0 = 0;
+    if (dt > 500) return;
+    if (Math.abs(dx) < 60) return;
+    if (Math.abs(dx) < Math.abs(dy) * 1.2) return;
+    if (dx < 0) selectRound(activeRound + 1);
+    else selectRound(activeRound - 1);
+  }, { passive: true });
 }
 
 function renderTabs() {
@@ -802,6 +838,7 @@ function updateStickyOffset() {
 
 activeRound = pickDefaultRound();
 render();
+setupSwipeGestures();
 updateStickyOffset();
 window.addEventListener('resize', updateStickyOffset);
 window.addEventListener('orientationchange', updateStickyOffset);
