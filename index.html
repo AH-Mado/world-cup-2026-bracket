@@ -286,21 +286,20 @@
   @media (max-width: 720px) {
     body { overflow-x: hidden; }
 
-    header { padding: 12px 16px; gap: 8px; }
+    header { padding: 14px 16px; gap: 10px; }
     header > div:first-child { flex: 1; min-width: 0; }
-    h1 { font-size: 16px; }
+    h1 { font-size: 17px; }
     .subtitle { font-size: 11px; margin-top: 3px; }
-    .btn { padding: 7px 12px; font-size: 12px; }
+    .btn { padding: 8px 12px; font-size: 12px; }
 
-    .champion-banner { margin: 12px 16px 0; padding: 14px 16px; gap: 12px; }
-    .trophy { font-size: 28px; }
-    .champion-name { font-size: 18px; }
+    .champion-banner { margin: 14px 16px 0; padding: 14px 18px; gap: 12px; }
+    .trophy { font-size: 30px; }
+    .champion-name { font-size: 20px; }
 
-    /* Round tabs: horizontal scroll, jump to round when tapped */
     .round-tabs {
       display: flex;
       gap: 6px;
-      padding: 12px 16px 4px;
+      padding: 14px 16px 0;
       overflow-x: auto;
       scrollbar-width: none;
       -webkit-overflow-scrolling: touch;
@@ -308,14 +307,14 @@
     .round-tabs::-webkit-scrollbar { display: none; }
     .round-tab {
       flex: 0 0 auto;
-      padding: 7px 14px;
+      padding: 8px 14px;
       border-radius: 999px;
       border: 1px solid var(--border);
       background: transparent;
       color: var(--muted);
       font-size: 11px;
       font-weight: 700;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
       cursor: pointer;
       font-family: inherit;
@@ -334,28 +333,28 @@
       font-weight: 500;
     }
 
-    /* Bracket: keep full tree layout, but scroll horizontally with snap */
     .bracket {
-      padding: 8px 16px 32px;
-      gap: 14px;
-      overflow-x: auto;
-      scroll-snap-type: x mandatory;
-      scroll-padding-left: 16px;
-      -webkit-overflow-scrolling: touch;
+      flex-direction: column;
+      padding: 14px 16px 32px;
+      gap: 0;
+      min-width: 0;
+      width: 100%;
     }
     .round {
-      min-width: 240px;
-      width: 240px;
-      scroll-snap-align: start;
-      flex-shrink: 0;
+      display: none;
+      min-width: 0;
+      width: 100%;
     }
-    .round-label { font-size: 10px; margin-bottom: 12px; padding: 6px 0; }
+    .round.active-round { display: flex; }
+    .round-label { display: none; }
+    .round-matches { gap: 12px; justify-content: flex-start; }
+    .match-slot { flex: 0 0 auto; }
 
-    .match { border-radius: 10px; }
-    .match-meta { padding: 7px 10px; font-size: 10px; letter-spacing: 0.06em; }
-    .team { padding: 12px 12px; min-height: 48px; }
-    .team .flag { font-size: 22px; width: 28px; }
-    .team .name { font-size: 14px; }
+    .match { border-radius: 12px; }
+    .match-meta { padding: 9px 14px; font-size: 11px; }
+    .team { padding: 14px 14px; min-height: 52px; }
+    .team .flag { font-size: 26px; width: 32px; }
+    .team .name { font-size: 15px; }
   }
 </style>
 </head>
@@ -576,11 +575,7 @@ let userSelectedRound = false;
 function selectRound(i) {
   userSelectedRound = true;
   activeRound = i;
-  const rounds = document.querySelectorAll('#bracket .round');
-  if (rounds[i]) {
-    rounds[i].scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
-  }
-  renderTabs();
+  render();
 }
 
 function renderTabs() {
@@ -596,27 +591,6 @@ function renderTabs() {
   }).join('');
 }
 
-let scrollObserver = null;
-function attachScrollTracking() {
-  if (scrollObserver) scrollObserver.disconnect();
-  const bracket = document.getElementById('bracket');
-  const rounds = bracket.querySelectorAll('.round');
-  scrollObserver = new IntersectionObserver((entries) => {
-    let best = null;
-    entries.forEach(e => {
-      if (e.isIntersecting && (!best || e.intersectionRatio > best.intersectionRatio)) best = e;
-    });
-    if (best) {
-      const idx = Array.from(rounds).indexOf(best.target);
-      if (idx >= 0 && idx !== activeRound) {
-        activeRound = idx;
-        renderTabs();
-      }
-    }
-  }, { root: bracket, threshold: [0.6] });
-  rounds.forEach(r => scrollObserver.observe(r));
-}
-
 function render() {
   const bracket = document.getElementById('bracket');
   bracket.innerHTML = ROUNDS.map((r, i) => `
@@ -629,7 +603,6 @@ function render() {
   `).join('');
 
   renderTabs();
-  attachScrollTracking();
 
   const champion = getWinner('final');
   const banner = document.getElementById('championBanner');
