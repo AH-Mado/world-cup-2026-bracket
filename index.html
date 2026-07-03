@@ -57,7 +57,12 @@
     font-size: 13px;
     margin-top: 4px;
   }
-  .reset-btn {
+  .header-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .btn {
     background: transparent;
     color: var(--muted);
     border: 1px solid var(--border);
@@ -68,12 +73,26 @@
     cursor: pointer;
     transition: all 0.15s ease;
     font-family: inherit;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
   }
-  .reset-btn:hover {
-    color: var(--text);
+  .btn:hover:not(:disabled) { color: var(--text); }
+  .btn:disabled { opacity: 0.5; cursor: default; }
+  .reset-btn:hover:not(:disabled) {
     border-color: var(--loser);
     background: rgba(255, 51, 102, 0.05);
   }
+  .refresh-btn:hover:not(:disabled) {
+    border-color: var(--accent);
+    background: rgba(0, 217, 126, 0.06);
+  }
+  .refresh-btn.loading .refresh-icon {
+    animation: spin 0.9s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .round-tabs { display: none; }
 
   .champion-banner {
     margin: 20px 32px 0;
@@ -265,11 +284,77 @@
   }
 
   @media (max-width: 720px) {
-    header { padding: 16px 20px; }
-    h1 { font-size: 18px; }
-    .subtitle { font-size: 12px; }
-    .bracket { padding: 20px; gap: 16px; }
-    .round { min-width: 210px; width: 210px; }
+    body { overflow-x: hidden; }
+
+    header { padding: 14px 16px; gap: 10px; }
+    header > div:first-child { flex: 1; min-width: 0; }
+    h1 { font-size: 17px; }
+    .subtitle { font-size: 11px; margin-top: 3px; }
+    .btn { padding: 8px 12px; font-size: 12px; }
+
+    .champion-banner { margin: 14px 16px 0; padding: 14px 18px; gap: 12px; }
+    .trophy { font-size: 30px; }
+    .champion-name { font-size: 20px; }
+
+    .round-tabs {
+      display: flex;
+      gap: 6px;
+      padding: 14px 16px 0;
+      overflow-x: auto;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+    }
+    .round-tabs::-webkit-scrollbar { display: none; }
+    .round-tab {
+      flex: 0 0 auto;
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      font-family: inherit;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+    }
+    .round-tab.active {
+      background: var(--accent);
+      color: #062818;
+      border-color: var(--accent);
+      box-shadow: 0 4px 14px var(--accent-glow);
+    }
+    .round-tab .tab-count {
+      opacity: 0.7;
+      margin-left: 4px;
+      font-weight: 500;
+    }
+
+    .bracket {
+      flex-direction: column;
+      padding: 14px 16px 32px;
+      gap: 0;
+      min-width: 0;
+      width: 100%;
+    }
+    .round {
+      display: none;
+      min-width: 0;
+      width: 100%;
+    }
+    .round.active-round { display: flex; }
+    .round-label { display: none; }
+    .round-matches { gap: 12px; justify-content: flex-start; }
+    .match-slot { flex: 0 0 auto; }
+
+    .match { border-radius: 12px; }
+    .match-meta { padding: 9px 14px; font-size: 11px; }
+    .team { padding: 14px 14px; min-height: 52px; }
+    .team .flag { font-size: 26px; width: 32px; }
+    .team .name { font-size: 15px; }
   }
 </style>
 </head>
@@ -279,7 +364,13 @@
     <h1>🏆 World Cup 2026 — Bracket Picker</h1>
     <div class="subtitle">Round of 32 onwards · <span id="liveStatus">Loading live data…</span> · Tap a team to pick your winner</div>
   </div>
-  <button class="reset-btn" onclick="resetPicks()">Reset my picks</button>
+  <div class="header-actions">
+    <button class="btn refresh-btn" onclick="refreshLive()" aria-label="Refresh live data">
+      <span class="refresh-icon" aria-hidden="true">↻</span>
+      <span>Refresh</span>
+    </button>
+    <button class="btn reset-btn" onclick="resetPicks()">Reset</button>
+  </div>
 </header>
 
 <div id="championBanner" class="champion-banner empty">
@@ -289,6 +380,8 @@
     <div id="championName" class="champion-name"></div>
   </div>
 </div>
+
+<div id="roundTabs" class="round-tabs" role="tablist" aria-label="Bracket rounds"></div>
 
 <div class="bracket" id="bracket"></div>
 
@@ -477,16 +570,39 @@ function matchHTML(match, isFinal) {
   </div>`;
 }
 
+let activeRound = 0;
+let userSelectedRound = false;
+function selectRound(i) {
+  userSelectedRound = true;
+  activeRound = i;
+  render();
+}
+
+function renderTabs() {
+  const tabs = document.getElementById('roundTabs');
+  tabs.innerHTML = ROUNDS.map((r, i) => {
+    const remaining = r.matches.filter(m => !m.locked).length;
+    const total = r.matches.length;
+    const countLabel = remaining === 0 ? '✓' : `${total - remaining}/${total}`;
+    const shortLabel = r.label.replace('Round of ', 'R').replace('Quarter-finals', 'QF').replace('Semi-finals', 'SF');
+    return `<button class="round-tab${i === activeRound ? ' active' : ''}" role="tab" aria-selected="${i === activeRound}" onclick="selectRound(${i})">
+      ${shortLabel}<span class="tab-count">${countLabel}</span>
+    </button>`;
+  }).join('');
+}
+
 function render() {
   const bracket = document.getElementById('bracket');
-  bracket.innerHTML = ROUNDS.map(r => `
-    <div class="round">
+  bracket.innerHTML = ROUNDS.map((r, i) => `
+    <div class="round${i === activeRound ? ' active-round' : ''}">
       <div class="round-label">${r.label}</div>
       <div class="round-matches">
         ${r.matches.map(m => `<div class="match-slot">${matchHTML(m, r.isFinal)}</div>`).join('')}
       </div>
     </div>
   `).join('');
+
+  renderTabs();
 
   const champion = getWinner('final');
   const banner = document.getElementById('championBanner');
@@ -631,6 +747,14 @@ function setStatus(text) {
   if (el) el.textContent = text;
 }
 
+function pickDefaultRound() {
+  // Earliest round that still has an unlocked match — where the action is.
+  for (let i = 0; i < ROUNDS.length; i++) {
+    if (ROUNDS[i].matches.some(m => !m.locked)) return i;
+  }
+  return ROUNDS.length - 1;
+}
+
 async function initLive() {
   try {
     const events = await fetchLiveData();
@@ -639,13 +763,14 @@ async function initLive() {
       return;
     }
     const { finishedCount, liveCount } = applyLiveData(events);
-    const now = new Date();
-    const hh = String(now.getHours()).padStart(2, '0');
-    const mm = String(now.getMinutes()).padStart(2, '0');
+    if (!userSelectedRound) activeRound = pickDefaultRound();
+    const cairoTime = new Intl.DateTimeFormat('en-US', {
+      timeZone: CAIRO_TZ, hour: 'numeric', minute: '2-digit', hour12: true
+    }).format(new Date());
     const bits = [];
     if (liveCount) bits.push(`${liveCount} live`);
     if (finishedCount) bits.push(`${finishedCount} finished`);
-    setStatus(`Live · ${bits.join(', ') || 'no changes'} · updated ${hh}:${mm}`);
+    setStatus(`Live · ${bits.join(', ') || 'no changes'} · ${cairoTime} Cairo`);
     render();
   } catch (e) {
     console.warn('Live fetch failed:', e);
@@ -653,6 +778,15 @@ async function initLive() {
   }
 }
 
+async function refreshLive() {
+  const btn = document.querySelector('.refresh-btn');
+  if (btn) { btn.disabled = true; btn.classList.add('loading'); }
+  setStatus('Refreshing…');
+  await initLive();
+  if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
+}
+
+activeRound = pickDefaultRound();
 render();
 initLive();
 </script>
