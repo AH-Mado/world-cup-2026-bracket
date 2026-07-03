@@ -299,10 +299,17 @@
     .round-tabs {
       display: flex;
       gap: 6px;
-      padding: 14px 16px 0;
+      padding: 10px 16px;
       overflow-x: auto;
       scrollbar-width: none;
       -webkit-overflow-scrolling: touch;
+      position: sticky;
+      top: var(--tabs-sticky-top, 60px);
+      z-index: 15;
+      background: rgba(10, 14, 26, 0.92);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
     }
     .round-tabs::-webkit-scrollbar { display: none; }
     .round-tab {
@@ -786,8 +793,18 @@ async function refreshLive() {
   if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
 }
 
+function updateStickyOffset() {
+  const header = document.querySelector('header');
+  if (!header) return;
+  const h = Math.ceil(header.getBoundingClientRect().height);
+  document.documentElement.style.setProperty('--tabs-sticky-top', `${h}px`);
+}
+
 activeRound = pickDefaultRound();
 render();
+updateStickyOffset();
+window.addEventListener('resize', updateStickyOffset);
+window.addEventListener('orientationchange', updateStickyOffset);
 initLive();
 </script>
 </body>
