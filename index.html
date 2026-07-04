@@ -410,19 +410,23 @@
     color: var(--text-dim);
   }
 
-  .side.winner .flag-badge {
-    border-color: var(--accent-2);
-    box-shadow: 0 0 0 2px rgba(43, 108, 255, 0.28), 0 6px 14px rgba(43, 108, 255, 0.32);
-    transform: translateY(-1px);
-  }
-  .side.winner .team-name { color: #fff; }
-  .side.winner .team-sub { color: var(--accent-2); }
   .side.locked { cursor: default; }
-  .side.locked.winner .flag-badge {
-    border-color: var(--live);
-    box-shadow: 0 0 0 2px rgba(255, 210, 63, 0.30), 0 6px 14px rgba(255, 210, 63, 0.28);
+
+  .flag-wrap {
+    position: relative;
+    display: inline-flex;
   }
-  .side.locked.winner .team-sub { color: var(--live); }
+  .winner-star {
+    position: absolute;
+    top: -1px;
+    font-size: 13px;
+    line-height: 1;
+    color: var(--accent);
+    text-shadow: 0 0 5px rgba(43, 108, 255, 0.6);
+    pointer-events: none;
+  }
+  .side.side-a .winner-star { right: -2px; }
+  .side.side-b .winner-star { left: -2px; }
 
   .side.empty { cursor: default; }
   .side.empty .flag-badge {
@@ -908,14 +912,18 @@ function sideHTML(team, matchId, side, opts) {
     </div>`;
   }
   const isWinner = picks[matchId] === side;
-  const classes = ['side'];
+  const classes = ['side', `side-${side}`];
   if (isWinner) classes.push('winner');
   if (isLocked) classes.push('locked');
   const onclick = isLocked ? '' : `onclick="pick('${matchId}','${side}')"`;
   const codeLabel = codeFor(team, side.toUpperCase());
+  const star = isWinner ? `<span class="winner-star" aria-label="winner">★</span>` : '';
 
   return `<div class="${classes.join(' ')}" ${onclick}>
-    <div class="flag-badge">${team.flag || '⚽'}</div>
+    <div class="flag-wrap">
+      <div class="flag-badge">${team.flag || '⚽'}</div>
+      ${star}
+    </div>
     <div class="team-name">${team.name}</div>
     <div class="team-sub">${codeLabel}</div>
   </div>`;
