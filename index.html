@@ -1221,6 +1221,9 @@ function setStatus(text, opts) {
 
 function pickDefaultRound() {
   for (let i = 0; i < ROUNDS.length; i++) {
+    if (ROUNDS[i].matches.some(m => m.score && /LIVE/i.test(m.score))) return i;
+  }
+  for (let i = 0; i < ROUNDS.length; i++) {
     if (ROUNDS[i].matches.some(m => !m.locked)) return i;
   }
   return ROUNDS.length - 1;
@@ -1234,7 +1237,11 @@ async function initLive() {
       return;
     }
     const { finishedCount, liveCount } = applyLiveData(events);
-    if (!userSelectedRound) activeRound = pickDefaultRound();
+    const currentRound = ROUNDS[activeRound];
+    const currentFullyLocked = currentRound && currentRound.matches.every(m => m.locked);
+    if (!userSelectedRound || currentFullyLocked) {
+      activeRound = pickDefaultRound();
+    }
     const cairoTime = new Intl.DateTimeFormat('en-US', {
       timeZone: CAIRO_TZ, hour: 'numeric', minute: '2-digit', hour12: true
     }).format(new Date());
