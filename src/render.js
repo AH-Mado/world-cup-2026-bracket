@@ -19,7 +19,7 @@ function codeFor(team, fallback) {
 }
 
 function sideHTML(team, matchId, side, opts) {
-  const { isLocked } = opts;
+  const { isLocked, isLive } = opts;
   if (!team) {
     return `<div class="side empty">
       <div class="flag-badge">?</div>
@@ -27,7 +27,10 @@ function sideHTML(team, matchId, side, opts) {
       <div class="team-sub">${t('tbd')}</div>
     </div>`;
   }
-  const isWinner = picks[matchId] === side;
+  // Suppress the star while a match is live — the currently-leading team isn't
+  // the winner yet, and a user's pre-match pick shouldn't look like a call on
+  // the live scoreline either. Star returns once the match is locked.
+  const isWinner = !isLive && picks[matchId] === side;
   const classes = ['side', `side-${side}`];
   if (isWinner) classes.push('winner');
   if (isLocked) classes.push('locked');
@@ -94,9 +97,9 @@ function matchHTML(match, isFinal) {
   </div>`;
 
   const scoreboard = `<div class="scoreboard">
-    ${sideHTML(teams[0], match.id, 'a', { isLocked })}
+    ${sideHTML(teams[0], match.id, 'a', { isLocked, isLive })}
     ${scoreCenter}
-    ${sideHTML(teams[1], match.id, 'b', { isLocked })}
+    ${sideHTML(teams[1], match.id, 'b', { isLocked, isLive })}
   </div>`;
 
   const canShowDetails = !!match.eventId && (isLocked || isLive);
