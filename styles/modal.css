@@ -2,7 +2,7 @@
 .details-btn {
   position: absolute;
   top: 6px;
-  right: 6px;
+  inset-inline-end: 6px;
   width: 22px; height: 22px;
   border-radius: 999px;
   border: 1px solid var(--border);
@@ -68,7 +68,7 @@
 }
 .modal-close {
   position: absolute;
-  top: 12px; right: 12px;
+  top: 12px; inset-inline-end: 12px;
   width: 32px; height: 32px;
   border-radius: 999px;
   background: var(--surface-2);
@@ -254,8 +254,10 @@
   font-size: 14px;
   color: var(--text);
 }
-.stat-row .stat-num.left { text-align: right; }
-.stat-row .stat-num.right { text-align: left; }
+/* Text-align via logical values so numbers stay pointing toward the middle
+   bar in both LTR (right/left) and RTL (left/right). */
+.stat-row .stat-num.left { text-align: end; }
+.stat-row .stat-num.right { text-align: start; }
 .stat-row .stat-num.winner { color: var(--accent-2); }
 .stat-row .stat-center {
   display: flex;
@@ -285,7 +287,7 @@
 .stat-bar .bar-b {
   background: linear-gradient(90deg, var(--live), #ffb400);
   transition: width 0.4s ease;
-  margin-left: auto;
+  margin-inline-start: auto;
 }
 
 .details-loading, .details-error {

@@ -1,5 +1,7 @@
 import { ROUNDS, TOTAL_MATCHES } from './data.js';
 import { picks, resolveTeams, getWinner } from './state.js';
+import { t, teamName, localizeFallbackDate } from './i18n.js';
+import { fmtDate } from './live.js';
 
 // UI state — which round tab is active, whether the user picked a tab
 // themselves (so live-refresh knows not to jump around under them), and
@@ -13,7 +15,7 @@ export function setActiveRound(i) { activeRound = i; }
 function codeFor(team, fallback) {
   if (!team) return fallback;
   if (team.code) return team.code;
-  return (team.name || '').slice(0, 3).toUpperCase();
+  return teamName(team).slice(0, 3).toUpperCase();
 }
 
 function sideHTML(team, matchId, side, opts) {
@@ -21,8 +23,8 @@ function sideHTML(team, matchId, side, opts) {
   if (!team) {
     return `<div class="side empty">
       <div class="flag-badge">?</div>
-      <div class="team-name">Awaiting winner</div>
-      <div class="team-sub">— TBD —</div>
+      <div class="team-name">${t('awaiting_winner')}</div>
+      <div class="team-sub">${t('tbd')}</div>
     </div>`;
   }
   const isWinner = picks[matchId] === side;
@@ -38,7 +40,7 @@ function sideHTML(team, matchId, side, opts) {
       <div class="flag-badge">${team.flag || '⚽'}</div>
       ${star}
     </div>
-    <div class="team-name">${team.name}</div>
+    <div class="team-name">${teamName(team)}</div>
     <div class="team-sub">${codeLabel}</div>
   </div>`;
 }
@@ -59,7 +61,12 @@ function matchHTML(match, isFinal) {
   const parsed = parseScore(match.score);
   const isLive = !!match.score && /LIVE/i.test(match.score);
 
-  const dateLabel = match.date || '';
+  // Prefer the raw ISO from ESPN (formatted fresh in the current locale) so
+  // toggling language re-localizes hydrated matches too. Fall back to the
+  // hard-coded seed date, translated on the fly when needed.
+  const dateLabel = match.dateIso
+    ? (fmtDate(match.dateIso) || localizeFallbackDate(match.date || ''))
+    : localizeFallbackDate(match.date || '');
   const venueLabel = match.venue || '';
   const datePillClass = parsed ? 'muted' : '';
 
@@ -68,13 +75,13 @@ function matchHTML(match, isFinal) {
         <div class="score"><span>${parsed.a}</span><span class="sep">:</span><span>${parsed.b}</span></div>
         ${parsed.detail ? `<div class="score-detail">${parsed.detail}</div>` : ''}
       </div>`
-    : `<div class="score-block"><div class="score vs">VS</div></div>`;
+    : `<div class="score-block"><div class="score vs">${t('vs')}</div></div>`;
 
   let statusRow;
   if (isLive) {
-    statusRow = `<div class="status-row"><div class="live-badge"><span class="blink"></span>LIVE</div></div>`;
+    statusRow = `<div class="status-row"><div class="live-badge"><span class="blink"></span>${t('live_badge')}</div></div>`;
   } else if (isLocked) {
-    statusRow = `<div class="status-row"><div class="status-note done">Full-time · locked</div></div>`;
+    statusRow = `<div class="status-row"><div class="status-note done">${t('full_time_locked')}</div></div>`;
   } else {
     statusRow = `<div class="status-row"><div class="status-note">${venueLabel}</div></div>`;
   }
@@ -94,7 +101,7 @@ function matchHTML(match, isFinal) {
 
   const canShowDetails = !!match.eventId && (isLocked || isLive);
   const detailsBtn = canShowDetails
-    ? `<button class="details-btn" onclick="event.stopPropagation();openDetails('${match.id}')" aria-label="Match details" title="Match details">
+    ? `<button class="details-btn" onclick="event.stopPropagation();openDetails('${match.id}')" aria-label="${t('match_details')}" title="${t('match_details')}">
         <span class="material-symbols-rounded">bar_chart</span>
       </button>`
     : '';
@@ -105,7 +112,7 @@ function matchHTML(match, isFinal) {
         ${detailsBtn}
         <div class="final-crown">
           <span class="material-symbols-rounded">trophy</span>
-          <p>The Grand Final</p>
+          <p>${t('grand_final')}</p>
         </div>
         ${meta}
         ${scoreboard}
@@ -170,8 +177,9 @@ function renderTabs() {
     const remaining = r.matches.filter(m => !m.locked).length;
     const total = r.matches.length;
     const countLabel = remaining === 0 ? '✓' : `${total - remaining}/${total}`;
+    const short = t(`round_${r.key}_short`);
     return `<button class="round-tab${i === activeRound ? ' active' : ''}" role="tab" aria-selected="${i === activeRound}" onclick="selectRound(${i})">
-      <span>${r.short}</span><span class="tab-count">${countLabel}</span>
+      <span>${short}</span><span class="tab-count">${countLabel}</span>
     </button>`;
   }).join('');
 }
@@ -203,7 +211,7 @@ export function render() {
   const name = document.getElementById('championName');
   if (champion) {
     banner.classList.remove('empty');
-    name.textContent = `${champion.flag}  ${champion.name}`;
+    name.textContent = `${champion.flag}  ${teamName(champion)}`;
   } else {
     banner.classList.add('empty');
   }

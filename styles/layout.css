@@ -51,6 +51,26 @@ header {
 .icon-btn:active { transform: scale(0.94); }
 .icon-btn.loading .material-symbols-rounded { animation: spin 0.9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+/* Text variant for the language toggle — same 40px pill, tight uppercase text. */
+.icon-btn.text-btn {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: var(--text);
+}
+html[lang="ar"] .icon-btn.text-btn {
+  font-family: var(--font-display-ar);
+  font-size: 18px;
+  letter-spacing: 0;
+}
+/* The ع glyph in Cairo sits noticeably below the visual centerline of a
+   round button. A small upward nudge realigns it with the refresh icon. */
+html[lang="ar"] #langLabel {
+  display: inline-block;
+  transform: translateY(-2px);
+  line-height: 1;
+}
 
 /* ── Hero context ───────────────────────────────────────── */
 .hero {

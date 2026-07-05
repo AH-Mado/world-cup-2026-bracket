@@ -1,5 +1,6 @@
 import { findMatch, resolveTeams } from './state.js';
 import { fmtDate } from './live.js';
+import { t, teamName } from './i18n.js';
 
 // Cache summary payloads in-memory — ESPN's endpoint is not cheap and the
 // modal will be reopened often. Cleared on page reload, which is fine.
@@ -7,17 +8,18 @@ const summaryCache = new Map();
 let modalOpenId = null;
 
 // ESPN's stats field names vary a bit across responses; each entry lists the
-// name candidates that map to one display row. Order here = display order.
+// name candidates that map to one display row plus the i18n key for its
+// label. Order here = display order.
 const STAT_KEYS = [
-  { keys: ['possessionpct', 'possession'],                                 label: 'Possession',      suffix: '%' },
-  { keys: ['totalshots', 'shots'],                                         label: 'Shots' },
-  { keys: ['shotsongoal', 'shotsontarget', 'shotsontargetnumeric'],        label: 'On target' },
-  { keys: ['corners', 'wonCorners', 'cornerkicks'],                        label: 'Corners' },
-  { keys: ['offsides'],                                                    label: 'Offsides' },
-  { keys: ['foulscommitted', 'fouls'],                                     label: 'Fouls' },
-  { keys: ['yellowcards'],                                                 label: 'Yellow cards' },
-  { keys: ['redcards'],                                                    label: 'Red cards' },
-  { keys: ['saves'],                                                       label: 'Saves' },
+  { keys: ['possessionpct', 'possession'],                                 labelKey: 'stat_possession', suffix: '%' },
+  { keys: ['totalshots', 'shots'],                                         labelKey: 'stat_shots' },
+  { keys: ['shotsongoal', 'shotsontarget', 'shotsontargetnumeric'],        labelKey: 'stat_on_target' },
+  { keys: ['corners', 'wonCorners', 'cornerkicks'],                        labelKey: 'stat_corners' },
+  { keys: ['offsides'],                                                    labelKey: 'stat_offsides' },
+  { keys: ['foulscommitted', 'fouls'],                                     labelKey: 'stat_fouls' },
+  { keys: ['yellowcards'],                                                 labelKey: 'stat_yellow' },
+  { keys: ['redcards'],                                                    labelKey: 'stat_red' },
+  { keys: ['saves'],                                                       labelKey: 'stat_saves' },
 ];
 
 function normStat(k) {
@@ -59,13 +61,17 @@ function goalRowHTML(g) {
   const minute = g.minute || '';
   const icon = g.ownGoal ? '🔄' : '⚽';
   const tagBits = [];
-  if (g.ownGoal) tagBits.push('OG');
-  if (g.penalty) tagBits.push('pen');
+  if (g.ownGoal) tagBits.push(t('goal_og'));
+  if (g.penalty) tagBits.push(t('goal_pen'));
   const tag = tagBits.length ? ` <span style="opacity:0.65">(${tagBits.join(', ')})</span>` : '';
+  // `dir="ltr"` on the minute forces bidi to treat it as a Latin unit. Without
+  // this, RTL context flips the neutral apostrophes and `+` and turns
+  // "90'+2'" into "'2+'90". The player name keeps its natural direction so it
+  // sits alongside Arabic goal tags cleanly.
   return `<div class="goal-row${g.ownGoal ? ' own-goal' : ''}">
     <span class="goal-icon">${icon}</span>
     <span class="goal-player">${player}${tag}</span>
-    <span class="goal-min">${minute}</span>
+    <span class="goal-min" dir="ltr">${minute}</span>
   </div>`;
 }
 
@@ -156,7 +162,7 @@ function renderModalContent(match, data) {
     statRows.push(`<div class="stat-row">
       <div class="stat-num left${winnerA ? ' winner' : ''}">${va ?? '—'}</div>
       <div class="stat-center">
-        <span class="stat-label">${s.label}</span>
+        <span class="stat-label">${t(s.labelKey)}</span>
         <div class="stat-bar">
           <div class="bar-a" style="width:${Math.max(0, Math.min(100, pctA))}%"></div>
           <div class="bar-b" style="width:${Math.max(0, Math.min(100, pctB))}%"></div>
@@ -172,41 +178,41 @@ function renderModalContent(match, data) {
 
   const scoreCenter = showScore
     ? `<div class="big-score"><span>${scoreA}</span><span class="sep">:</span><span>${scoreB}</span></div>
-       <div class="status${isLive ? ' live' : ''}">${detailText || (isFinal ? 'Full-time' : (isLive ? 'Live' : ''))}</div>`
-    : `<div class="big-score" style="color:var(--text-dim);font-size:22px">VS</div>
+       <div class="status${isLive ? ' live' : ''}">${detailText || (isFinal ? t('full_time') : (isLive ? t('live_label') : ''))}</div>`
+    : `<div class="big-score" style="color:var(--text-dim);font-size:22px">${t('vs')}</div>
        <div class="status">${detailText || dateStr}</div>`;
 
   const goalsSection = (goalsA.length || goalsB.length)
     ? `<div class="modal-section">
-        <div class="modal-section-title">Goal scorers</div>
+        <div class="modal-section-title">${t('goal_scorers')}</div>
         <div class="goals-grid">
-          <div class="goals-col${goalsA.length ? '' : ' empty-col'}">${goalsA.length ? goalsA.join('') : 'No goals'}</div>
-          <div class="goals-col${goalsB.length ? '' : ' empty-col'}">${goalsB.length ? goalsB.join('') : 'No goals'}</div>
+          <div class="goals-col${goalsA.length ? '' : ' empty-col'}">${goalsA.length ? goalsA.join('') : t('no_goals')}</div>
+          <div class="goals-col${goalsB.length ? '' : ' empty-col'}">${goalsB.length ? goalsB.join('') : t('no_goals')}</div>
         </div>
       </div>`
     : '';
 
   const statsSection = statRows.length
     ? `<div class="modal-section">
-        <div class="modal-section-title">Match stats</div>
+        <div class="modal-section-title">${t('match_stats')}</div>
         ${statRows.join('')}
       </div>`
     : '';
 
   const noDataNotice = (!goalsA.length && !goalsB.length && !statRows.length)
-    ? `<div class="details-loading" style="padding:24px 0">No detailed stats published yet. Check back after kickoff.</div>`
+    ? `<div class="details-loading" style="padding:24px 0">${t('modal_no_stats')}</div>`
     : '';
 
   return `
     <div class="modal-header">
       <div class="side-mini">
         <div class="flag-mini">${teamA?.flag || '⚽'}</div>
-        <div class="name-mini">${teamA?.name || '—'}</div>
+        <div class="name-mini">${teamName(teamA) || '—'}</div>
       </div>
       <div class="score-mini">${scoreCenter}</div>
       <div class="side-mini">
         <div class="flag-mini">${teamB?.flag || '⚽'}</div>
-        <div class="name-mini">${teamB?.name || '—'}</div>
+        <div class="name-mini">${teamName(teamB) || '—'}</div>
       </div>
     </div>
     <div class="modal-meta">
@@ -281,7 +287,7 @@ export async function openDetails(matchId) {
   const body = document.getElementById('modalBody');
   const backdrop = document.getElementById('modalBackdrop');
   const sheet = document.getElementById('modalSheet');
-  body.innerHTML = `<div class="details-loading"><div class="spinner"></div>Loading match details…</div>`;
+  body.innerHTML = `<div class="details-loading"><div class="spinner"></div>${t('modal_loading')}</div>`;
   backdrop.classList.add('open');
   sheet.classList.add('open');
   document.body.style.overflow = 'hidden';
@@ -294,7 +300,7 @@ export async function openDetails(matchId) {
     if (modalOpenId !== matchId) return;
     body.innerHTML = `<div class="details-error">
       <span class="material-symbols-rounded">error</span>
-      Couldn't load match details.<br><span style="font-size:11px;opacity:0.7">${e.message || e}</span>
+      ${t('modal_error')}<br><span style="font-size:11px;opacity:0.7">${e.message || e}</span>
     </div>`;
   }
 }

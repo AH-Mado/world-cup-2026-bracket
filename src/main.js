@@ -1,13 +1,14 @@
 import { applyPick, resetAllPicks } from './state.js';
 import { render, selectRound, setupSwipeGestures, setActiveRound } from './render.js';
-import { initLive, refreshLive, pickDefaultRound } from './live.js';
+import { initLive, refreshLive, pickDefaultRound, refreshStatusAfterLangChange } from './live.js';
 import { openDetails, closeDetails } from './details.js';
+import { toggleLang, applyI18n, t } from './i18n.js';
 
 // Inline `onclick=` handlers in the rendered HTML call these by name, so they
 // must live on the global scope. Everything else stays module-scoped.
 window.pick        = (matchId, side) => { if (applyPick(matchId, side)) render(); };
 window.resetPicks  = () => {
-  if (!confirm('Reset all your picks? Locked real-world results stay.')) return;
+  if (!confirm(t('reset_confirm'))) return;
   resetAllPicks();
   render();
 };
@@ -15,6 +16,12 @@ window.selectRound = selectRound;
 window.refreshLive = refreshLive;
 window.openDetails = openDetails;
 window.closeDetails = closeDetails;
+window.toggleLang  = () => {
+  toggleLang();
+  applyI18n();
+  render();
+  refreshStatusAfterLangChange();
+};
 
 // The round-tabs bar sticks below the header — feed the header's real height
 // into a CSS var so a taller header on wider screens still docks correctly.
@@ -25,6 +32,7 @@ function updateStickyOffset() {
   document.documentElement.style.setProperty('--tabs-sticky-top', `${h}px`);
 }
 
+applyI18n();
 setActiveRound(pickDefaultRound());
 render();
 setupSwipeGestures();
