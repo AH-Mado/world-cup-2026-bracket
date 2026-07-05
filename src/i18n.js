@@ -77,7 +77,7 @@ const dict = {
     live_cached:        'شبكة محفوظة',
     live_offline:       'غير متصل · شبكة محفوظة',
     live_refreshing:    'جاري التحديث…',
-    live_status:        'مباشر · {0} · {1}',
+    live_status:        'مباشر — {0} — {1}',
     live_finished_n:    '{0} منتهية',
     live_live_n:        '{0} مباشرة',
     live_no_changes:    'لا تغييرات',
