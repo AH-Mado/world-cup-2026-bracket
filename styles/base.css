@@ -1,0 +1,92 @@
+:root {
+  /* Stitch dark sports palette */
+  --bg:              #0b1226;
+  --bg-elevated:     #111a34;
+  --surface:         #17223f;
+  --surface-2:       #1e2a4d;
+  --surface-3:       #24325c;
+  --border:          #253356;
+  --border-strong:   #2f416f;
+
+  --text:            #ffffff;
+  --text-muted:      #a4b0cf;
+  --text-dim:        #7787ac;
+
+  --accent:          #2b6cff;   /* bright pill blue */
+  --accent-2:        #4d8bff;
+  --accent-soft:     rgba(43, 108, 255, 0.16);
+  --accent-strong:   #1f5be6;
+
+  --live:            #ffd23f;   /* live yellow */
+  --live-ink:        #322400;
+
+  --success:         #34d399;
+  --danger:          #ef4d5a;
+
+  --font-display: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-body:    'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-mono:    'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+
+  --radius-card: 22px;
+  --radius-pill: 999px;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background:
+    radial-gradient(1200px 600px at 15% -10%, rgba(43, 108, 255, 0.14), transparent 60%),
+    radial-gradient(900px 500px at 110% 10%, rgba(77, 139, 255, 0.10), transparent 55%),
+    var(--bg);
+  background-attachment: fixed;
+  color: var(--text);
+  font-family: var(--font-body);
+  min-height: 100vh;
+  padding-bottom: 132px;
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.005em;
+}
+.material-symbols-rounded {
+  font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 24;
+  font-family: 'Material Symbols Rounded';
+}
+
+/* Before the icon font resolves the browser falls back to rendering the raw
+   ligature text ("refresh", "bar_chart", …). Replace each icon slot with a
+   correctly-sized shimmering square until `document.fonts.ready` resolves. */
+html:not(.fonts-ready) .material-symbols-rounded {
+  color: transparent !important;
+  background: linear-gradient(90deg,
+    rgba(255, 255, 255, 0.05) 0%,
+    rgba(255, 255, 255, 0.14) 50%,
+    rgba(255, 255, 255, 0.05) 100%);
+  background-size: 220% 100%;
+  animation: iconShimmer 1.4s ease-in-out infinite;
+  border-radius: 5px;
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  overflow: hidden;
+  line-height: 1;
+  vertical-align: middle;
+}
+@keyframes iconShimmer {
+  0%   { background-position: 220% 0; }
+  100% { background-position: -120% 0; }
+}
+
+/* Skeleton the date-pill label and status-note until the first live fetch
+   resolves, so cards don't briefly flash stale placeholder text. */
+html:not(.data-ready) .date-pill > span:last-child,
+html:not(.data-ready) .status-note {
+  color: transparent !important;
+  background: linear-gradient(90deg,
+    rgba(255, 255, 255, 0.06) 0%,
+    rgba(255, 255, 255, 0.16) 50%,
+    rgba(255, 255, 255, 0.06) 100%);
+  background-size: 220% 100%;
+  animation: iconShimmer 1.4s ease-in-out infinite;
+  border-radius: 4px;
+  display: inline-block;
+  min-width: 60px;
+}
