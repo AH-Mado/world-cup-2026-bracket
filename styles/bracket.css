@@ -141,12 +141,12 @@
 .side:hover:not(.empty):not(.locked) { background: rgba(255, 255, 255, 0.03); }
 .side:active:not(.empty):not(.locked) { transform: scale(0.97); }
 .flag-badge {
-  width: 48px; height: 48px;
+  width: 58px; height: 58px;
   border-radius: 50%;
   background: var(--surface-2);
   border: 1px solid var(--border);
   display: flex; align-items: center; justify-content: center;
-  font-size: 26px;
+  font-size: 32px;
   line-height: 1;
   overflow: hidden;
   box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.02), 0 4px 10px rgba(0, 0, 0, 0.3);
@@ -352,7 +352,7 @@ html[lang="ar"] .status-note { font-size: 11.5px; letter-spacing: 0; }
 }
 
 @media (max-width: 420px) {
-  .flag-badge { width: 44px; height: 44px; font-size: 24px; }
+  .flag-badge { width: 54px; height: 54px; font-size: 30px; }
   .score { font-size: 18px; }
   .score .sep { font-size: 15px; }
   .side .team-name { font-size: 10.5px; max-width: 88px; }
@@ -371,6 +371,6 @@ html[lang="ar"] .status-note { font-size: 11.5px; letter-spacing: 0; }
     max-width: 400px;
     margin: 0 auto;
   }
-  .flag-badge { width: 52px; height: 52px; font-size: 28px; }
+  .flag-badge { width: 64px; height: 64px; font-size: 34px; }
   .score { font-size: 22px; }
 }
