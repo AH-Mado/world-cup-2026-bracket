@@ -220,6 +220,60 @@ function renderModalContent(match, data) {
   `;
 }
 
+// Bind swipe-down-to-dismiss on the modal sheet. Idempotent — safe to call
+// on every openDetails; runs the actual wiring only once.
+function setupSheetDrag() {
+  const sheet = document.getElementById('modalSheet');
+  if (!sheet || sheet.__dragReady) return;
+  sheet.__dragReady = true;
+  const body = document.getElementById('modalBody');
+  const backdrop = document.getElementById('modalBackdrop');
+
+  let startY = null;   // clientY at touchstart, or null when not dragging
+  let dy = 0;          // current downward displacement in px
+  let t0 = 0;          // touchstart timestamp for velocity
+
+  sheet.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) return;
+    // If the touch is inside the scrollable body AND the body is scrolled,
+    // let it scroll normally instead of hijacking as a drag.
+    if (body.contains(e.target) && body.scrollTop > 0) return;
+    startY = e.touches[0].clientY;
+    dy = 0;
+    t0 = Date.now();
+    sheet.style.transition = 'none';
+    backdrop.style.transition = 'none';
+  }, { passive: true });
+
+  sheet.addEventListener('touchmove', (e) => {
+    if (startY == null) return;
+    const raw = e.touches[0].clientY - startY;
+    if (raw <= 0) { dy = 0; sheet.style.transform = ''; backdrop.style.opacity = ''; return; }
+    // Slight rubber-band past 200px so far pulls don't scale linearly forever.
+    dy = raw > 200 ? 200 + (raw - 200) * 0.3 : raw;
+    sheet.style.transform = `translate(-50%, ${dy}px)`;
+    // Fade the backdrop in proportion to how far the sheet has moved off.
+    const sheetH = sheet.offsetHeight || 500;
+    backdrop.style.opacity = Math.max(0, 1 - dy / sheetH).toFixed(3);
+  }, { passive: true });
+
+  sheet.addEventListener('touchend', () => {
+    if (startY == null) return;
+    const displacement = dy;
+    const velocity = displacement / Math.max(1, Date.now() - t0); // px per ms
+    startY = null;
+    // Restore transitions and clear inline overrides so the class-based
+    // transform (`translate(-50%, 0)` when open, `100%` when not) takes over
+    // and the browser animates from the current inline position.
+    sheet.style.transition = '';
+    backdrop.style.transition = '';
+    sheet.style.transform = '';
+    backdrop.style.opacity = '';
+    // Close on either a decisive displacement or a fast downward flick.
+    if (displacement > 120 || velocity > 0.6) closeDetails();
+  }, { passive: true });
+}
+
 export async function openDetails(matchId) {
   const match = findMatch(matchId);
   if (!match || !match.eventId) return;
@@ -231,6 +285,7 @@ export async function openDetails(matchId) {
   backdrop.classList.add('open');
   sheet.classList.add('open');
   document.body.style.overflow = 'hidden';
+  setupSheetDrag();
   try {
     const data = await fetchSummary(match.eventId);
     if (modalOpenId !== matchId) return;
