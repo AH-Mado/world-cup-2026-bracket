@@ -95,14 +95,14 @@
   gap: 5px;
   background: var(--accent);
   color: #fff;
-  padding: 3px 9px;
+  padding: 3px 10px;
   border-radius: var(--radius-pill);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: -0.005em;
   box-shadow: 0 3px 10px rgba(43, 108, 255, 0.25);
 }
-.date-pill .material-symbols-rounded { font-size: 11px; opacity: 0.9; }
+.date-pill .material-symbols-rounded { font-size: 12px; opacity: 0.9; }
 .date-pill.muted {
   background: var(--surface-2);
   color: var(--text-muted);
@@ -187,8 +187,10 @@
   text-shadow: 0 0 5px rgba(43, 108, 255, 0.6);
   pointer-events: none;
 }
-.side.side-a .winner-star { right: -2px; }
-.side.side-b .winner-star { left: -2px; }
+/* Logical props so the winner-star sits on the outward side of the flag in
+   both LTR and RTL (dir=rtl on <html> flips both automatically). */
+.side.side-a .winner-star { inset-inline-end: -2px; }
+.side.side-b .winner-star { inset-inline-start: -2px; }
 
 .side.empty { cursor: default; }
 .side.empty .flag-badge {
@@ -312,6 +314,7 @@
   color: var(--accent-2);
   font-weight: 600;
 }
+html[lang="ar"] .status-note { font-size: 11.5px; letter-spacing: 0; }
 
 /* Final match — glowing crown ring */
 .match.final-match {
@@ -353,7 +356,7 @@
   .score { font-size: 18px; }
   .score .sep { font-size: 15px; }
   .side .team-name { font-size: 10.5px; max-width: 88px; }
-  .date-pill { padding: 3px 8px; font-size: 9.5px; }
+  .date-pill { padding: 3px 9px; font-size: 11px; }
 }
 
 @media (min-width: 720px) {

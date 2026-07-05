@@ -1,20 +1,41 @@
 import { ROUNDS } from './data.js';
 import { picks, resolveTeams, clearDownstream, reapplyAllLocks } from './state.js';
 import { render, setActiveRound, activeRound, userSelectedRound } from './render.js';
+import { t, lang, englishName } from './i18n.js';
 
 // All times shown to users are Cairo local — this is a single-user app and
 // that's where the user is. Change here if the host of the app moves.
 const CAIRO_TZ = 'Africa/Cairo';
-const CAIRO_PARTS = new Intl.DateTimeFormat('en-US', {
-  timeZone: CAIRO_TZ, weekday: 'short', month: 'short', day: 'numeric',
-  hour: 'numeric', minute: '2-digit', hour12: true
-});
 
 export function fmtDate(iso) {
   if (!iso) return null;
   const d = new Date(iso);
   if (isNaN(d)) return null;
-  const parts = Object.fromEntries(CAIRO_PARTS.formatToParts(d).map(p => [p.type, p.value]));
+  if (lang === 'ar') {
+    // Target format: "السبت ٠٤ يوليو ٨:٠٠ م"
+    //  - day BEFORE month (Arabic reading order), zero-padded, Arabic-Indic digits
+    //  - space-separated between the calendar parts (middle-dot looks pinched in Arabic type)
+    //  - time is wrapped in LRI/PDI (U+2066 / U+2069) isolates so the digits +
+    //    colon in "٨:٠٠" don't get reordered by bidi into "٠٠:٨" — without the
+    //    isolate the browser resolves the colon (a neutral) inside the RTL run
+    //    and flips the visual order of the time components.
+    const fmt = new Intl.DateTimeFormat('ar-EG', {
+      timeZone: CAIRO_TZ, weekday: 'long', month: 'long', day: '2-digit',
+      hour: 'numeric', minute: '2-digit', hour12: true
+    });
+    const parts = Object.fromEntries(fmt.formatToParts(d).map(p => [p.type, p.value]));
+    // In Arabic reading (right-to-left), the hour should be encountered first.
+    // The digits inside the isolate still render LTR, so writing them as
+    // "minute : hour" produces "٠٠ : ٨" visually — which reads as "8 : 00"
+    // when the eye moves right-to-left through the surrounding Arabic text.
+    const time = `⁦${parts.minute} : ${parts.hour}⁩`;
+    return `${parts.weekday} ${parts.day} ${parts.month} ${time} ${parts.dayPeriod || ''}`.trim();
+  }
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: CAIRO_TZ, weekday: 'short', month: 'short', day: 'numeric',
+    hour: 'numeric', minute: '2-digit', hour12: true
+  });
+  const parts = Object.fromEntries(fmt.formatToParts(d).map(p => [p.type, p.value]));
   const ampm = (parts.dayPeriod || '').toUpperCase();
   return `${parts.weekday} · ${parts.month} ${parts.day} · ${parts.hour}:${parts.minute} ${ampm}`;
 }
@@ -70,9 +91,11 @@ function normalizeEvent(ev) {
 }
 
 function findApiMatch(events, teamA, teamB) {
+  const nameA = englishName(teamA);
+  const nameB = englishName(teamB);
   return events.find(ev =>
-    (namesMatch(ev.home, teamA.name) && namesMatch(ev.away, teamB.name)) ||
-    (namesMatch(ev.home, teamB.name) && namesMatch(ev.away, teamA.name))
+    (namesMatch(ev.home, nameA) && namesMatch(ev.away, nameB)) ||
+    (namesMatch(ev.home, nameB) && namesMatch(ev.away, nameA))
   );
 }
 
@@ -91,13 +114,17 @@ function applyLiveData(rawEvents) {
       const ev = findApiMatch(events, teams[0], teams[1]);
       if (!ev) continue;
 
+      // Keep the raw ISO so render can format fresh in the current language —
+      // otherwise a language toggle leaves already-hydrated matches stuck in
+      // whatever locale was active at hydration time.
+      if (ev.date) m.dateIso = ev.date;
       const dateStr = fmtDate(ev.date);
       if (dateStr) m.date = dateStr;
       if (ev.venue) m.venue = ev.venue;
       if (ev.id) m.eventId = ev.id;
 
       const hasScores = !isNaN(ev.homeScore) && !isNaN(ev.awayScore);
-      const homeIsA = namesMatch(ev.home, teams[0].name);
+      const homeIsA = namesMatch(ev.home, englishName(teams[0]));
       m.homeIsA = homeIsA;
       const aScore = hasScores ? (homeIsA ? ev.homeScore : ev.awayScore) : null;
       const bScore = hasScores ? (homeIsA ? ev.awayScore : ev.homeScore) : null;
@@ -161,7 +188,7 @@ export async function initLive() {
   try {
     const events = await fetchLiveData();
     if (!events.length) {
-      setStatus('Cached bracket');
+      setStatus(t('live_cached'));
       return;
     }
     const { finishedCount, liveCount } = applyLiveData(events);
@@ -170,24 +197,41 @@ export async function initLive() {
     if (!userSelectedRound || currentFullyLocked) {
       setActiveRound(pickDefaultRound());
     }
-    const cairoTime = new Intl.DateTimeFormat('en-US', {
+    const locale = lang === 'ar' ? 'ar-EG' : 'en-US';
+    const cairoTime = new Intl.DateTimeFormat(locale, {
       timeZone: CAIRO_TZ, hour: 'numeric', minute: '2-digit', hour12: true
     }).format(new Date());
     const bits = [];
-    if (liveCount) bits.push(`${liveCount} live`);
-    if (finishedCount) bits.push(`${finishedCount} finished`);
-    setStatus(`Live · ${bits.join(', ') || 'no changes'} · ${cairoTime}`);
+    if (liveCount) bits.push(t('live_live_n', liveCount));
+    if (finishedCount) bits.push(t('live_finished_n', finishedCount));
+    setStatus(t('live_status', bits.join(', ') || t('live_no_changes'), cairoTime));
     render();
   } catch (e) {
     console.warn('Live fetch failed:', e);
-    setStatus('Offline · cached bracket');
+    setStatus(t('live_offline'));
   }
 }
 
 export async function refreshLive() {
-  const btn = document.querySelector('.icon-btn');
+  const btn = document.getElementById('refreshBtn');
   if (btn) { btn.disabled = true; btn.classList.add('loading'); }
-  setStatus('Refreshing…', { loading: true });
+  setStatus(t('live_refreshing'), { loading: true });
   await initLive();
   if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
+}
+
+// After the language changes, all currently-visible strings need to be
+// re-rendered from the new dictionary — the dynamic bracket, and any status
+// text we've written to the pill.
+export function refreshStatusAfterLangChange() {
+  // Re-derive the last status text from the ROUNDS state; if nothing's live
+  // yet, just show the default loading message.
+  const anyLive = ROUNDS.some(r => r.matches.some(m => m.score && /LIVE/i.test(m.score)));
+  const anyLocked = ROUNDS.some(r => r.matches.some(m => m.locked));
+  if (!anyLocked && !anyLive) return; // keep 'loading' until fetch completes
+  const el = document.getElementById('liveStatus');
+  if (el && (el.textContent || '').length) {
+    // Trigger a fresh initLive to re-format numbers + time in the new locale.
+    initLive();
+  }
 }

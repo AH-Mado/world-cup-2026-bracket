@@ -26,6 +26,10 @@
   --font-display: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   --font-body:    'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   --font-mono:    'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  /* Cairo family is drawn to match Inter's proportions but with real Arabic
+     letterforms. Applied globally when the document lang is `ar`. */
+  --font-display-ar: 'Cairo', 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-body-ar:    'Cairo', 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
 
   --radius-card: 22px;
   --radius-pill: 999px;
@@ -45,6 +49,29 @@ body {
   padding-bottom: 132px;
   -webkit-font-smoothing: antialiased;
   letter-spacing: -0.005em;
+}
+
+/* When the doc is Arabic, swap the whole font stack to Cairo and drop the
+   tight negative letter-spacing (which is tuned for Latin only and looks
+   pinched on Arabic glyphs). */
+html[lang="ar"] body {
+  font-family: var(--font-body-ar);
+  letter-spacing: 0;
+}
+html[lang="ar"] h1,
+html[lang="ar"] .champion-name,
+html[lang="ar"] .brand-chip,
+html[lang="ar"] .team-name,
+html[lang="ar"] .score,
+html[lang="ar"] .progress-text,
+html[lang="ar"] .reset-btn,
+html[lang="ar"] .name-mini,
+html[lang="ar"] .big-score,
+html[lang="ar"] .modal-section-title,
+html[lang="ar"] .stat-num,
+html[lang="ar"] .round-tab {
+  font-family: var(--font-display-ar);
+  letter-spacing: 0;
 }
 .material-symbols-rounded {
   font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 24;

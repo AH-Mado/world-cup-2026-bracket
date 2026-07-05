@@ -5,10 +5,22 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>World Cup 2026 — Bracket Picker</title>
 <meta name="theme-color" content="#0b1226">
+<script>
+  // Pre-hydration lang/dir so Arabic users don't flash LTR before main.js runs.
+  // Kept minimal and inline — reads the same localStorage key as src/i18n.js.
+  try {
+    var l = localStorage.getItem('wc2026-lang-v1');
+    if (l === 'ar') {
+      document.documentElement.setAttribute('lang', 'ar');
+      document.documentElement.setAttribute('dir', 'rtl');
+    }
+  } catch (e) {}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,300..700,0..1,-25..0&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles/base.css">
 <link rel="stylesheet" href="styles/layout.css">
 <link rel="stylesheet" href="styles/bracket.css">
@@ -20,7 +32,20 @@
     <div class="brand-chip">WC26</div>
   </div>
   <div class="header-actions">
-    <button class="icon-btn" onclick="refreshLive()" aria-label="Refresh live data" title="Refresh">
+    <button
+      id="langBtn"
+      class="icon-btn text-btn"
+      onclick="toggleLang()"
+      data-i18n-attr="aria-label:language, title:language"
+    >
+      <span id="langLabel">EN</span>
+    </button>
+    <button
+      id="refreshBtn"
+      class="icon-btn"
+      onclick="refreshLive()"
+      data-i18n-attr="aria-label:refresh, title:refresh"
+    >
       <span class="material-symbols-rounded">refresh</span>
     </button>
   </div>
@@ -28,20 +53,20 @@
 
 <section class="hero">
   <div class="hero-top">
-    <div class="hero-eyebrow"><span class="dot"></span>Knockout Stage</div>
+    <div class="hero-eyebrow"><span class="dot"></span><span data-i18n="hero_eyebrow">Knockout Stage</span></div>
     <div class="live-pill shimmer" id="livePill">
       <span class="live-dot"></span>
-      <span id="liveStatus">Loading live data…</span>
+      <span id="liveStatus" data-i18n="live_loading">Loading live data…</span>
     </div>
   </div>
-  <h1>Pick your champion.</h1>
-  <p class="hero-sub">Tap a team to advance them. Locked cards show the real result — everything else is your call.</p>
+  <h1 data-i18n="hero_h1">Pick your champion.</h1>
+  <p class="hero-sub" data-i18n="hero_sub">Tap a team to advance them. Locked cards show the real result — everything else is your call.</p>
 </section>
 
 <div id="championBanner" class="champion-banner empty">
   <div class="trophy"><span class="material-symbols-rounded">trophy</span></div>
   <div>
-    <div class="champion-label">Your Predicted Champion</div>
+    <div class="champion-label" data-i18n="champion_label">Your Predicted Champion</div>
     <div id="championName" class="champion-name"></div>
   </div>
 </div>
@@ -52,22 +77,18 @@
 
 <div class="progress-bar-wrap">
   <div>
-    <div class="progress-label">Your Progress</div>
+    <div class="progress-label" data-i18n="progress_label">Your Progress</div>
     <div class="progress-row">
       <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
       <span class="progress-text" id="progressText">0/31</span>
     </div>
   </div>
-  <button class="reset-btn" onclick="resetPicks()">Reset</button>
+  <button class="reset-btn" onclick="resetPicks()" data-i18n="reset_btn">Reset</button>
 </div>
-
-<footer>
-  Data as of 30 June 2026 · Locked matches show real results · Your picks save automatically in this browser
-</footer>
 
 <div id="modalBackdrop" class="modal-backdrop" onclick="closeDetails()"></div>
 <div id="modalSheet" class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-  <button class="modal-close" onclick="closeDetails()" aria-label="Close details">
+  <button class="modal-close" onclick="closeDetails()" data-i18n-attr="aria-label:close_details">
     <span class="material-symbols-rounded">close</span>
   </button>
   <div class="modal-grabber"></div>
