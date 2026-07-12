@@ -184,10 +184,29 @@ function fingerprintEvents(events) {
 }
 let lastEventsFingerprint = null;
 let firstInitDone = false;
+// Counts from the last applyLiveData walk. Remembered so a silent tick can
+// recompose the pill's wall-clock text without rerunning applyLiveData when
+// nothing else has moved.
+let lastCounts = { finishedCount: 0, liveCount: 0 };
+
+function composeStatusText(liveCount, finishedCount) {
+  const locale = lang === 'ar' ? 'ar-EG' : 'en-US';
+  const cairoTime = new Intl.DateTimeFormat(locale, {
+    timeZone: CAIRO_TZ, hour: 'numeric', minute: '2-digit', hour12: true
+  }).format(new Date());
+  const bits = [];
+  if (liveCount) bits.push(t('live_live_n', liveCount));
+  if (finishedCount) bits.push(t('live_finished_n', finishedCount));
+  return t('live_status', bits.join(', ') || t('live_no_changes'), cairoTime);
+}
 
 function setStatus(text, opts) {
   const el = document.getElementById('liveStatus');
-  if (el) el.textContent = text;
+  // Identity guard: writing the same text back would still show up in a
+  // MutationObserver `characterData` list even though the pixels are
+  // identical. Skipping keeps the pill perfectly still when the minute
+  // hasn't rolled over yet.
+  if (el && el.textContent !== text) el.textContent = text;
   const pill = document.getElementById('livePill');
   if (pill) pill.classList.toggle('shimmer', !!(opts && opts.loading));
 }
@@ -221,10 +240,17 @@ export async function initLive({ force = false } = {}) {
     const changed = fp !== lastEventsFingerprint;
     lastEventsFingerprint = fp;
 
-    // Silent tick with byte-identical data → do nothing, no flicker.
-    if (!force && firstInitDone && !changed) return;
+    // Silent tick with byte-identical data → don't rebuild the bracket, but
+    // still refresh the pill's wall-clock text so the user sees the app is
+    // alive. `setStatus`'s identity guard makes it a no-op when the minute
+    // hasn't rolled over yet.
+    if (!force && firstInitDone && !changed) {
+      setStatus(composeStatusText(lastCounts.liveCount, lastCounts.finishedCount));
+      return;
+    }
 
     const { finishedCount, liveCount } = applyLiveData(events);
+    lastCounts = { finishedCount, liveCount };
 
     // Round auto-selection only on the very first hydration. On subsequent
     // ticks we never yank the user's tab, even if the round they were
@@ -235,14 +261,7 @@ export async function initLive({ force = false } = {}) {
       if (!userSelectedRound || currentFullyLocked) setActiveRound(pickDefaultRound());
     }
 
-    const locale = lang === 'ar' ? 'ar-EG' : 'en-US';
-    const cairoTime = new Intl.DateTimeFormat(locale, {
-      timeZone: CAIRO_TZ, hour: 'numeric', minute: '2-digit', hour12: true
-    }).format(new Date());
-    const bits = [];
-    if (liveCount) bits.push(t('live_live_n', liveCount));
-    if (finishedCount) bits.push(t('live_finished_n', finishedCount));
-    setStatus(t('live_status', bits.join(', ') || t('live_no_changes'), cairoTime));
+    setStatus(composeStatusText(liveCount, finishedCount));
     render();
     firstInitDone = true;
   } catch (e) {
