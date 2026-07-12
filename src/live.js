@@ -165,6 +165,26 @@ async function fetchLiveData() {
   return data.events || [];
 }
 
+// A stable fingerprint of the fields we actually render. The 5s auto-refresh
+// compares this to the previous tick's value and short-circuits when nothing
+// moved, so the bracket doesn't rebuild and the status pill doesn't tick its
+// timestamp when nothing has actually happened.
+function fingerprintEvents(events) {
+  return JSON.stringify(events.map(ev => {
+    const comp = (ev.competitions && ev.competitions[0]) || {};
+    const cs = comp.competitors || [];
+    const home = cs.find(c => c.homeAway === 'home') || cs[0];
+    const away = cs.find(c => c.homeAway === 'away') || cs[1];
+    return [
+      ev.id, ev.date,
+      ev.status?.type?.state, ev.status?.type?.completed, ev.status?.type?.detail,
+      home?.score, away?.score, home?.winner, away?.winner,
+    ];
+  }));
+}
+let lastEventsFingerprint = null;
+let firstInitDone = false;
+
 function setStatus(text, opts) {
   const el = document.getElementById('liveStatus');
   if (el) el.textContent = text;
@@ -184,19 +204,37 @@ export function pickDefaultRound() {
   return ROUNDS.length - 1;
 }
 
-export async function initLive() {
+// `force: true` bypasses the change-detection short-circuit and always
+// re-renders + updates the status pill (used by the manual refresh button so
+// the user gets explicit feedback even if the server had nothing new).
+// The default (`force: false`) is the silent 5s tick — it only touches the
+// UI when the ESPN payload actually changed.
+export async function initLive({ force = false } = {}) {
   try {
     const events = await fetchLiveData();
     if (!events.length) {
-      setStatus(t('live_cached'));
+      if (force || !firstInitDone) setStatus(t('live_cached'));
+      firstInitDone = true;
       return;
     }
+    const fp = fingerprintEvents(events);
+    const changed = fp !== lastEventsFingerprint;
+    lastEventsFingerprint = fp;
+
+    // Silent tick with byte-identical data → do nothing, no flicker.
+    if (!force && firstInitDone && !changed) return;
+
     const { finishedCount, liveCount } = applyLiveData(events);
-    const currentRound = ROUNDS[activeRound];
-    const currentFullyLocked = currentRound && currentRound.matches.every(m => m.locked);
-    if (!userSelectedRound || currentFullyLocked) {
-      setActiveRound(pickDefaultRound());
+
+    // Round auto-selection only on the very first hydration. On subsequent
+    // ticks we never yank the user's tab, even if the round they were
+    // watching just finished locking — they can navigate themselves.
+    if (!firstInitDone) {
+      const currentRound = ROUNDS[activeRound];
+      const currentFullyLocked = currentRound && currentRound.matches.every(m => m.locked);
+      if (!userSelectedRound || currentFullyLocked) setActiveRound(pickDefaultRound());
     }
+
     const locale = lang === 'ar' ? 'ar-EG' : 'en-US';
     const cairoTime = new Intl.DateTimeFormat(locale, {
       timeZone: CAIRO_TZ, hour: 'numeric', minute: '2-digit', hour12: true
@@ -206,9 +244,10 @@ export async function initLive() {
     if (finishedCount) bits.push(t('live_finished_n', finishedCount));
     setStatus(t('live_status', bits.join(', ') || t('live_no_changes'), cairoTime));
     render();
+    firstInitDone = true;
   } catch (e) {
     console.warn('Live fetch failed:', e);
-    setStatus(t('live_offline'));
+    if (force || !firstInitDone) setStatus(t('live_offline'));
   }
 }
 
@@ -216,7 +255,7 @@ export async function refreshLive() {
   const btn = document.getElementById('refreshBtn');
   if (btn) { btn.disabled = true; btn.classList.add('loading'); }
   setStatus(t('live_refreshing'), { loading: true });
-  await initLive();
+  await initLive({ force: true });
   if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
 }
 
@@ -232,6 +271,8 @@ export function refreshStatusAfterLangChange() {
   const el = document.getElementById('liveStatus');
   if (el && (el.textContent || '').length) {
     // Trigger a fresh initLive to re-format numbers + time in the new locale.
-    initLive();
+    // Force it — otherwise the change-detection short-circuit skips work when
+    // the ESPN payload hasn't moved and the pill would stay in the old lang.
+    initLive({ force: true });
   }
 }

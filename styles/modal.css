@@ -239,6 +239,23 @@
 }
 .goal-row.own-goal .goal-player { font-style: italic; color: var(--text-muted); }
 
+/* ── Timeline events (subs, cards, missed penalties) ────── */
+.event-row .event-player {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--text);
+  word-break: break-word;
+}
+.event-row .sub-in  { color: var(--accent-2); }
+.event-row .sub-out { color: var(--text-muted); }
+.event-row.event-yellow .event-player { color: #e6c34a; }
+.event-row.event-red    .event-player { color: var(--danger, #ff6b6b); }
+.event-row.event-pen-miss .event-player { color: var(--text-muted); text-decoration: line-through; }
+.event-row.event-pen-miss .event-player span { text-decoration: none; }
+
 /* ── Match stats (comparison bars) ──────────────────────── */
 .stat-row {
   display: grid;

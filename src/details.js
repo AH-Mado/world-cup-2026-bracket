@@ -1,59 +1,48 @@
 import { findMatch, resolveTeams } from './state.js';
 import { fmtDate } from './live.js';
 import { t, teamName } from './i18n.js';
+import {
+  STAT_KEYS,
+  statValue,
+  parseStatNumber,
+  extractGoals,
+  extractEvents,
+} from './details-parse.js';
 
 // Cache summary payloads in-memory — ESPN's endpoint is not cheap and the
-// modal will be reopened often. Cleared on page reload, which is fine.
+// modal will be reopened often. For live matches we bypass the cache so the
+// 5s auto-refresh sees fresh goals / stats.
 const summaryCache = new Map();
 let modalOpenId = null;
+// Fingerprint of the summary currently rendered into the modal body. The
+// silent auto-refresh compares against this to skip re-rendering when the
+// payload is byte-identical to what the user is already looking at — no
+// innerHTML flicker, no scroll jitter.
+let renderedFingerprint = null;
 
-// ESPN's stats field names vary a bit across responses; each entry lists the
-// name candidates that map to one display row plus the i18n key for its
-// label. Order here = display order.
-const STAT_KEYS = [
-  { keys: ['possessionpct', 'possession'],                                 labelKey: 'stat_possession', suffix: '%' },
-  { keys: ['totalshots', 'shots'],                                         labelKey: 'stat_shots' },
-  { keys: ['shotsongoal', 'shotsontarget', 'shotsontargetnumeric'],        labelKey: 'stat_on_target' },
-  { keys: ['corners', 'wonCorners', 'cornerkicks'],                        labelKey: 'stat_corners' },
-  { keys: ['offsides'],                                                    labelKey: 'stat_offsides' },
-  { keys: ['foulscommitted', 'fouls'],                                     labelKey: 'stat_fouls' },
-  { keys: ['yellowcards'],                                                 labelKey: 'stat_yellow' },
-  { keys: ['redcards'],                                                    labelKey: 'stat_red' },
-  { keys: ['saves'],                                                       labelKey: 'stat_saves' },
-];
-
-function normStat(k) {
-  return (k || '').toLowerCase().replace(/[^a-z]/g, '');
+function fingerprintSummary(data) {
+  const comp = data?.header?.competitions?.[0] || {};
+  return JSON.stringify({
+    status: comp.status,
+    scores: (comp.competitors || []).map(c => [c.homeAway, c.score, c.winner]),
+    keyEvents: data?.keyEvents,
+    details: comp.details,
+    box: (data?.boxscore?.teams || []).map(tm => tm.statistics),
+  });
 }
 
-function statValue(teamStats, keys) {
-  if (!teamStats) return null;
-  const normKeys = keys.map(normStat);
-  for (const s of teamStats) {
-    const n = normStat(s.name || s.abbreviation || s.displayName);
-    if (normKeys.includes(n)) {
-      const raw = s.displayValue != null ? s.displayValue : s.value;
-      if (raw == null || raw === '') return null;
-      return String(raw);
-    }
-  }
-  return null;
-}
-
-function parseStatNumber(str) {
-  if (str == null) return NaN;
-  const m = String(str).match(/-?\d+(\.\d+)?/);
-  return m ? parseFloat(m[0]) : NaN;
-}
-
-async function fetchSummary(eventId) {
-  if (summaryCache.has(eventId)) return summaryCache.get(eventId);
+async function fetchSummary(eventId, { bypassCache = false } = {}) {
+  if (!bypassCache && summaryCache.has(eventId)) return summaryCache.get(eventId);
   const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/summary?event=${eventId}`;
   const res = await fetch(url, { cache: 'no-store' });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
   summaryCache.set(eventId, data);
   return data;
+}
+
+function isMatchLive(match) {
+  return !!(match && match.score && /LIVE/i.test(match.score));
 }
 
 function goalRowHTML(g) {
@@ -75,41 +64,30 @@ function goalRowHTML(g) {
   </div>`;
 }
 
-// Goals sit under `header.competitions[0].details` (with `scoringPlay: true`)
-// on newer ESPN summaries; older ones expose `scoringPlays` at the top level.
-// Prefer the first shape, fall back to the second.
-function extractGoals(data, homeC, awayC, homeIsA) {
-  const details = data?.header?.competitions?.[0]?.details || [];
-  const scoringDetails = details.filter(d => d.scoringPlay);
-  const source = scoringDetails.length
-    ? scoringDetails.map(d => ({
-        player: d.participants?.[0]?.athlete?.displayName || d.text || 'Goal',
-        minute: d.clock?.displayValue || '',
-        teamId: d.team?.id,
-        ownGoal: d.ownGoal === true,
-        penalty: d.penaltyKick === true,
-      }))
-    : (data?.scoringPlays || []).map(p => ({
-        player: p.athletesInvolved?.[0]?.displayName || (p.text || '').replace(/\s*-\s*Goal.*$/i, '').trim() || 'Goal',
-        minute: p.clock?.displayValue || '',
-        teamId: p.team?.id,
-        ownGoal: /own\s*goal/i.test(p.type?.text || '') || /own\s*goal/i.test(p.text || ''),
-        penalty: /pen/i.test(p.type?.text || ''),
-      }));
-
-  const a = [], b = [];
-  for (const g of source) {
-    const isHome = g.teamId && homeC && String(g.teamId) === String(homeC.id);
-    const isAway = g.teamId && awayC && String(g.teamId) === String(awayC.id);
-    let side;
-    if (isHome) side = homeIsA ? 'a' : 'b';
-    else if (isAway) side = homeIsA ? 'b' : 'a';
-    // ESPN already assigns own goals to the credited (opposing) team in the
-    // scoringPlay's `team` field, so no flip is needed here.
-    if (side === 'a') a.push(g);
-    else if (side === 'b') b.push(g);
+function eventRowHTML(e) {
+  const minute = e.minute || '';
+  let icon = '•';
+  let body = '';
+  if (e.kind === 'sub') {
+    icon = '🔁';
+    const inLabel  = `<span class="sub-in">↑ ${e.playerIn || '—'}</span>`;
+    const outLabel = `<span class="sub-out">↓ ${e.playerOut || '—'}</span>`;
+    body = `<span class="event-player">${inLabel}<br>${outLabel}</span>`;
+  } else if (e.kind === 'yellow') {
+    icon = '🟨';
+    body = `<span class="event-player">${e.player || t('unknown_player')}</span>`;
+  } else if (e.kind === 'red') {
+    icon = '🟥';
+    body = `<span class="event-player">${e.player || t('unknown_player')}</span>`;
+  } else if (e.kind === 'pen-miss') {
+    icon = '❌';
+    body = `<span class="event-player">${e.player || t('unknown_player')} <span style="opacity:0.65">(${t('pen_missed')})</span></span>`;
   }
-  return { a, b };
+  return `<div class="goal-row event-row event-${e.kind}">
+    <span class="goal-icon">${icon}</span>
+    ${body}
+    <span class="goal-min" dir="ltr">${minute}</span>
+  </div>`;
 }
 
 function renderModalContent(match, data) {
@@ -135,6 +113,10 @@ function renderModalContent(match, data) {
   const goals = extractGoals(data, homeC, awayC, homeIsA);
   const goalsA = goals.a.map(goalRowHTML);
   const goalsB = goals.b.map(goalRowHTML);
+
+  const events = extractEvents(data, homeC, awayC, homeIsA);
+  const eventsA = events.a.map(eventRowHTML);
+  const eventsB = events.b.map(eventRowHTML);
 
   const boxTeams = (data && data.boxscore && data.boxscore.teams) || [];
   const homeBox = boxTeams.find(t => t.homeAway === 'home') || boxTeams[0];
@@ -192,6 +174,16 @@ function renderModalContent(match, data) {
       </div>`
     : '';
 
+  const timelineSection = (eventsA.length || eventsB.length)
+    ? `<div class="modal-section">
+        <div class="modal-section-title">${t('timeline')}</div>
+        <div class="goals-grid">
+          <div class="goals-col${eventsA.length ? '' : ' empty-col'}">${eventsA.length ? eventsA.join('') : t('no_events')}</div>
+          <div class="goals-col${eventsB.length ? '' : ' empty-col'}">${eventsB.length ? eventsB.join('') : t('no_events')}</div>
+        </div>
+      </div>`
+    : '';
+
   const statsSection = statRows.length
     ? `<div class="modal-section">
         <div class="modal-section-title">${t('match_stats')}</div>
@@ -199,7 +191,7 @@ function renderModalContent(match, data) {
       </div>`
     : '';
 
-  const noDataNotice = (!goalsA.length && !goalsB.length && !statRows.length)
+  const noDataNotice = (!goalsA.length && !goalsB.length && !eventsA.length && !eventsB.length && !statRows.length)
     ? `<div class="details-loading" style="padding:24px 0">${t('modal_no_stats')}</div>`
     : '';
 
@@ -221,6 +213,7 @@ function renderModalContent(match, data) {
       ${attendance ? `<span class="meta-chip"><span class="material-symbols-rounded">groups</span>${attendance}</span>` : ''}
     </div>
     ${goalsSection}
+    ${timelineSection}
     ${statsSection}
     ${noDataNotice}
   `;
@@ -293,11 +286,13 @@ export async function openDetails(matchId) {
   document.body.style.overflow = 'hidden';
   setupSheetDrag();
   try {
-    const data = await fetchSummary(match.eventId);
+    const data = await fetchSummary(match.eventId, { bypassCache: isMatchLive(match) });
     if (modalOpenId !== matchId) return;
     body.innerHTML = renderModalContent(match, data);
+    renderedFingerprint = fingerprintSummary(data);
   } catch (e) {
     if (modalOpenId !== matchId) return;
+    renderedFingerprint = null;
     body.innerHTML = `<div class="details-error">
       <span class="material-symbols-rounded">error</span>
       ${t('modal_error')}<br><span style="font-size:11px;opacity:0.7">${e.message || e}</span>
@@ -307,9 +302,37 @@ export async function openDetails(matchId) {
 
 export function closeDetails() {
   modalOpenId = null;
+  renderedFingerprint = null;
   document.getElementById('modalBackdrop').classList.remove('open');
   document.getElementById('modalSheet').classList.remove('open');
   document.body.style.overflow = '';
+}
+
+// Silent background re-fetch for the currently-open modal. Called by the
+// 5s auto-refresh in main.js so live matches keep their goals / stats /
+// timeline current without any user interaction. Preserves scroll position
+// through the innerHTML swap so an ongoing read isn't yanked back to the top.
+// Bails out entirely when the summary hasn't changed since the last render,
+// so a modal on a completed / paused match stays perfectly still every tick.
+export async function refreshOpenDetails() {
+  if (!modalOpenId) return;
+  const matchId = modalOpenId;
+  const match = findMatch(matchId);
+  if (!match || !match.eventId) return;
+  try {
+    const data = await fetchSummary(match.eventId, { bypassCache: isMatchLive(match) });
+    if (modalOpenId !== matchId) return;
+    const fp = fingerprintSummary(data);
+    if (fp === renderedFingerprint) return; // Nothing changed — no repaint.
+    renderedFingerprint = fp;
+    const body = document.getElementById('modalBody');
+    if (!body) return;
+    const savedScroll = body.scrollTop;
+    body.innerHTML = renderModalContent(match, data);
+    body.scrollTop = savedScroll;
+  } catch (_) {
+    // Silent — leave whatever's already on screen. The next tick will retry.
+  }
 }
 
 document.addEventListener('keydown', (e) => {
